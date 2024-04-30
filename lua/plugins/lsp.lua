@@ -119,6 +119,18 @@ return {
       ensure_installed = vim.tbl_keys(servers),
     }
 
+    -- NOTE! For developing in platform io, where compile_commands.json come from gcc, clangd can go a bit silly. Can setup with the compiler path like this.
+    -- Not sure how to automate this just yet 
+    -- local lspconfig = require('lspconfig')
+    -- lspconfig.clangd.setup {
+    --   cmd = { "clangd", "--background-index", "--query-driver=/home/tristan/.platformio/packages/toolchain-xtensa-esp32/bin/xtensa-esp32-elf-*" },
+    --   on_attach = function(client, bufnr)
+    --     client.server_capabilities.signatureHelpProvider = false
+    --     on_attach(client, bufnr)
+    --   end,
+    --   capabilities = capabilities,
+    -- }
+
     mason_lspconfig.setup_handlers {
       function(server_name)
         require('lspconfig')[server_name].setup {
