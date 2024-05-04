@@ -119,17 +119,12 @@ return {
       ensure_installed = vim.tbl_keys(servers),
     }
 
-    -- NOTE! For developing in platform io, where compile_commands.json come from gcc, clangd can go a bit silly. Can setup with the compiler path like this.
-    -- Not sure how to automate this just yet 
-    -- local lspconfig = require('lspconfig')
-    -- lspconfig.clangd.setup {
-    --   cmd = { "clangd", "--background-index", "--query-driver=/home/tristan/.platformio/packages/toolchain-xtensa-esp32/bin/xtensa-esp32-elf-*" },
-    --   on_attach = function(client, bufnr)
-    --     client.server_capabilities.signatureHelpProvider = false
-    --     on_attach(client, bufnr)
-    --   end,
-    --   capabilities = capabilities,
-    -- }
+    local function get_cmd()
+      -- TODO look in the folder for a platformio.ini file and infer the compiler path from the contents
+        --cmd = {"clangd", "--background-index", "--query-driver=/home/tristan/.platformio/packages/toolchain-riscv32-esp/bin/riscv32-esp-elf-*"}, --esp32c3
+        --cmd = { "clangd", "--background-index", "--query-driver=/home/tristan/.platformio/packages/toolchain-xtensa-esp32/bin/xtensa-esp32-elf-*" }, --esp32
+      return {"clangd", "--background-index", "--query-driver=/home/tristan/.platformio/packages/toolchain-riscv32-esp/bin/riscv32-esp-elf-*"}
+    end
 
     mason_lspconfig.setup_handlers {
       function(server_name)
@@ -140,12 +135,16 @@ return {
           filetypes = (servers[server_name] or {}).filetypes,
         }
       end,
+      ["clangd"] = function() -- clangd might need us to set the compiler path if we are working with an embedded target
+        require('lspconfig').clangd.setup {
+          cmd = get_cmd(),
+        }
+      end,
     }
 
     -- TW added to get the return type from a function on hover
     vim.lsp.buf.hover()
 
-    -- TW TODO - set this up to make it nicer to navigate the autocomplete
     -- [[ Configure nvim-cmp ]]
     -- See `:help cmp`
     local cmp = require 'cmp'
