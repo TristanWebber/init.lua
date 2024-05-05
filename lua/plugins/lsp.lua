@@ -119,26 +119,52 @@ return {
       ensure_installed = vim.tbl_keys(servers),
     }
 
+    --TODO: Infer if it is an embedded target. This issue also exists for esp-idif projects and likely any other embedded project....
+    local function is_pio_project()
+      local cwd = vim.loop.cwd()
+      local f = io.open(cwd .. "/platformio.ini", "r")
+      return f~= nil and io.close(f)
+    end
+
+    --TODO: Infer the compiler path from the contents of the platformio.ini file, or the compile_commands.json file
+    --Anticipating that because there could be multiple environments in a pio.ini file, we don't actually know what the target should be until we have the compile_commands
+    --So if we have a hashmap of targets and compilers we can pull the target out of the compile_commands and set the compiler path accordingly
     local function get_cmd()
-      -- TODO look in the folder for a platformio.ini file and infer the compiler path from the contents
-        --cmd = {"clangd", "--background-index", "--query-driver=/home/tristan/.platformio/packages/toolchain-riscv32-esp/bin/riscv32-esp-elf-*"}, --esp32c3
-        --cmd = { "clangd", "--background-index", "--query-driver=/home/tristan/.platformio/packages/toolchain-xtensa-esp32/bin/xtensa-esp32-elf-*" }, --esp32
-      return {"clangd", "--background-index", "--query-driver=/home/tristan/.platformio/packages/toolchain-riscv32-esp/bin/riscv32-esp-elf-*"}
+      --return { "clangd", "--background-index", "--query-driver=/home/tristan/.espressif/tools/riscv32-esp-elf/esp-13.2.0_20230928/riscv32-esp-elf/bin/riscv32-esp-elf-*" } --esp-idf esp32
+      --return { "clangd", "--background-index", "--query-driver=/home/tristan/.platformio/packages/toolchain-xtensa-esp32/bin/xtensa-esp32-elf-*" } --pio esp32
+      return {"clangd", "--background-index", "--query-driver=/home/tristan/.platformio/packages/toolchain-riscv32-esp/bin/riscv32-esp-elf-*"} --pio esp32c3
     end
 
     mason_lspconfig.setup_handlers {
       function(server_name)
-        require('lspconfig')[server_name].setup {
-          capabilities = capabilities,
-          on_attach = on_attach,
-          settings = servers[server_name],
-          filetypes = (servers[server_name] or {}).filetypes,
-        }
-      end,
-      ["clangd"] = function() -- clangd might need us to set the compiler path if we are working with an embedded target
-        require('lspconfig').clangd.setup {
-          cmd = get_cmd(),
-        }
+        if server_name ~= "clangd" then
+          require('lspconfig')[server_name].setup {
+            capabilities = capabilities,
+            on_attach = on_attach,
+            settings = servers[server_name],
+            filetypes = (servers[server_name] or {}).filetypes,
+          }
+        else
+          if is_pio_project() then
+            require('lspconfig').clangd.setup {
+              cmd = get_cmd(),
+              on_attach = function(client, bufnr)
+                client.server_capabilities.signatureHelpProvider = false
+                on_attach(client, bufnr)
+              end,
+              capabilities = capabilities,
+            }
+          else
+            require('lspconfig').clangd.setup {
+              cmd = get_cmd(),
+              on_attach = function(client, bufnr)
+                client.server_capabilities.signatureHelpProvider = false
+                on_attach(client, bufnr)
+              end,
+              capabilities = capabilities,
+            }
+          end
+        end
       end,
     }
 
