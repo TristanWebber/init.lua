@@ -119,20 +119,94 @@ return {
       ensure_installed = vim.tbl_keys(servers),
     }
 
-    --TODO: Infer if it is an embedded target. This issue also exists for esp-idif projects and likely any other embedded project....
-    local function is_pio_project()
+    local embedded_env = {
+      NONE = 1,
+      PIO = 2,
+      IDF = 3,
+    }
+
+    local function get_embedded_env()
       local cwd = vim.loop.cwd()
-      local f = io.open(cwd .. "/platformio.ini", "r")
-      return f~= nil and io.close(f)
+      local f_pio = io.open(cwd .. "/platformio.ini")
+      if f_pio then
+        io.close(f_pio)
+        return embedded_env.PIO
+      end
+      local f_idf = io.open(cwd .. "/dependencies.lock", "r")
+      if f_idf then
+        io.close(f_idf)
+        return embedded_env.IDF
+      end
+      return embedded_env.NONE
     end
 
-    --TODO: Infer the compiler path from the contents of the platformio.ini file, or the compile_commands.json file
-    --Anticipating that because there could be multiple environments in a pio.ini file, we don't actually know what the target should be until we have the compile_commands
-    --So if we have a hashmap of targets and compilers we can pull the target out of the compile_commands and set the compiler path accordingly
-    local function get_cmd()
-      --return { "clangd", "--background-index", "--query-driver=/home/tristan/.espressif/tools/riscv32-esp-elf/esp-13.2.0_20230928/riscv32-esp-elf/bin/riscv32-esp-elf-*" } --esp-idf esp32
-      --return { "clangd", "--background-index", "--query-driver=/home/tristan/.platformio/packages/toolchain-xtensa-esp32/bin/xtensa-esp32-elf-*" } --pio esp32
-      return {"clangd", "--background-index", "--query-driver=/home/tristan/.platformio/packages/toolchain-riscv32-esp/bin/riscv32-esp-elf-*"} --pio esp32c3
+    local function get_idf_mcu()
+      local cwd = vim.loop.cwd()
+      for line in io.lines(cwd .. "/dependencies.lock") do
+        if string.find(line, "target:") then
+          local words = {}
+          for word in line:gmatch("%w+") do
+            words[#words+1] = word
+          end
+          return words[2]
+        end
+      end
+    end
+
+    -- TODO. This is still hacky
+    -- It looks like an avr project doesn't need the query-driver. Whole compiler path is already included
+    -- For an esp32 project, In compile_commands.json, pattern is:
+      -- Find value for first "command" kvp
+      -- split value on spaces
+      -- find first item with pattern containing */tools/sdk/"value"/*
+      -- extract "value" -> This dictates the compiler path
+    local function get_pio_mcu()
+      local cwd = vim.loop.cwd()
+      local lines = {}
+      for line in io.lines(cwd .. "/compile_commands.json") do
+        lines[#lines+1] = line
+      end
+      for _, line in pairs(lines) do
+        if string.find(line, "\"command\":") then
+          for word in line:gmatch("%w+") do
+            if string.find(word, "esp32") then
+              return word
+            end
+          end
+        end
+      end
+    end
+
+    local function get_cmd(env_type)
+      if env_type == embedded_env.IDF then
+        local mcu_type = get_idf_mcu()
+        if mcu_type == "esp32" then
+          return { "clangd", "--background-index", "--query-driver=/home/tristan/.espressif/tools/xtensa-esp-elf/esp-13.2.0_20230928/xtensa-esp-elf/bin/xtensa-esp32-elf-*" } --esp-idf esp32
+        end
+        if mcu_type == "esp32c3" then
+          print("using idf and esp32c3")
+          return { "clangd", "--background-index", "--query-driver=/home/tristan/.espressif/tools/riscv32-esp-elf/esp-13.2.0_20230928/riscv32-esp-elf/bin/riscv32-esp-elf-*" } --esp-idf esp32c3
+        end
+        if mcu_type == "esp32s2" then
+          return { "clangd", "--background-index", "--query-driver=/home/tristan/.espressif/tools/xtensa-esp-elf/esp-13.2.0_20230928/xtensa-esp-elf/bin/xtensa-esp32s2-elf-*" } --esp-idf esp32s3
+        end
+        if mcu_type == "esp32s3" then
+          return { "clangd", "--background-index", "--query-driver=/home/tristan/.espressif/tools/xtensa-esp-elf/esp-13.2.0_20230928/xtensa-esp-elf/bin/xtensa-esp32s3-elf-*" } --esp-idf esp32s3
+        end
+        else if env_type == embedded_env.PIO then
+          local mcu_type = get_pio_mcu()
+          if mcu_type == "esp32" then
+            return { "clangd", "--background-index", "--query-driver=/home/tristan/.platformio/packages/toolchain-xtensa-esp32/bin/xtensa-esp32-elf-*" } --pio esp32
+          end
+          if mcu_type == "esp32c3" then
+            print("using pio and esp32c3")
+            return {"clangd", "--background-index", "--query-driver=/home/tristan/.espressif/tools/riscv32-esp-elf/esp-13.2.0_20230928/riscv32-esp-elf/bin/riscv32-esp-elf-*"} --pio esp32c3
+          end
+          if mcu_type == "esp32s3" then
+            return { "/home/tristan/.llvm-project-xtensa/llvm-project/build/bin/clangd", "--background-index", "--query-driver=/home/tristan/.platformio/packages/toolchain-xtensa-esp32s3/bin/xtensa-esp32s3-elf-g*" } --pio esp32s3
+          end
+        end
+      end
     end
 
     mason_lspconfig.setup_handlers {
@@ -145,18 +219,21 @@ return {
             filetypes = (servers[server_name] or {}).filetypes,
           }
         else
-          if is_pio_project() then
+            -- specific treatment of clangd for embedded projects
+          local env = get_embedded_env()
+          if env ~= embedded_env.NONE then
             require('lspconfig').clangd.setup {
-              cmd = get_cmd(),
+              cmd = get_cmd(env),
               on_attach = function(client, bufnr)
                 client.server_capabilities.signatureHelpProvider = false
                 on_attach(client, bufnr)
               end,
               capabilities = capabilities,
             }
-          else
+          end
+          -- not an embedded project
+          if env == embedded_env.NONE then
             require('lspconfig').clangd.setup {
-              cmd = get_cmd(),
               on_attach = function(client, bufnr)
                 client.server_capabilities.signatureHelpProvider = false
                 on_attach(client, bufnr)
