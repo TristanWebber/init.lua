@@ -153,13 +153,6 @@ return {
       end
     end
 
-    -- TODO. This is still hacky
-    -- It looks like an avr project doesn't need the query-driver. Whole compiler path is already included
-    -- For an esp32 project, In compile_commands.json, pattern is:
-      -- Find value for first "command" kvp
-      -- split value on spaces
-      -- find first item with pattern containing */tools/sdk/"value"/*
-      -- extract "value" -> This dictates the compiler path
     local function get_pio_mcu()
       local cwd = vim.loop.cwd()
       local lines = {}
@@ -168,10 +161,13 @@ return {
       end
       for _, line in pairs(lines) do
         if string.find(line, "\"command\":") then
-          for word in line:gmatch("%w+") do
-            if string.find(word, "esp32") then
-              return word
-            end
+          local idx
+          _, idx = string.find(line, "/tools/sdk/")
+          if idx then
+            local mcu = string.sub(line, idx + 1, #line)
+            idx, _ = string.find(mcu, "/")
+            mcu = string.sub(mcu, 1, idx - 1)
+            return mcu
           end
         end
       end
@@ -184,7 +180,6 @@ return {
           return { "clangd", "--background-index", "--query-driver=/home/tristan/.espressif/tools/xtensa-esp-elf/esp-13.2.0_20230928/xtensa-esp-elf/bin/xtensa-esp32-elf-*" } --esp-idf esp32
         end
         if mcu_type == "esp32c3" then
-          print("using idf and esp32c3")
           return { "clangd", "--background-index", "--query-driver=/home/tristan/.espressif/tools/riscv32-esp-elf/esp-13.2.0_20230928/riscv32-esp-elf/bin/riscv32-esp-elf-*" } --esp-idf esp32c3
         end
         if mcu_type == "esp32s2" then
@@ -199,7 +194,6 @@ return {
             return { "clangd", "--background-index", "--query-driver=/home/tristan/.platformio/packages/toolchain-xtensa-esp32/bin/xtensa-esp32-elf-*" } --pio esp32
           end
           if mcu_type == "esp32c3" then
-            print("using pio and esp32c3")
             return {"clangd", "--background-index", "--query-driver=/home/tristan/.espressif/tools/riscv32-esp-elf/esp-13.2.0_20230928/riscv32-esp-elf/bin/riscv32-esp-elf-*"} --pio esp32c3
           end
           if mcu_type == "esp32s3" then
