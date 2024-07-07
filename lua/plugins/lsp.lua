@@ -155,21 +155,11 @@ return {
 
     local function get_pio_mcu()
       local cwd = vim.loop.cwd()
-      local lines = {}
       for line in io.lines(cwd .. "/compile_commands.json") do
-        lines[#lines+1] = line
-      end
-      for _, line in pairs(lines) do
-        if string.find(line, "\"command\":") then
-          local idx
-          _, idx = string.find(line, "/tools/sdk/")
-          if idx then
-            local mcu = string.sub(line, idx + 1, #line)
-            idx, _ = string.find(mcu, "/")
-            mcu = string.sub(mcu, 1, idx - 1)
+          local mcu = line:match("/tools/sdk/([^/]+)")
+          if mcu then
             return mcu
           end
-        end
       end
     end
 
