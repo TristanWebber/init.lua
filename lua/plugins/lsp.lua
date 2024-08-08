@@ -184,7 +184,7 @@ return {
             return { "clangd", "--background-index", "--query-driver=/home/tristan/.platformio/packages/toolchain-xtensa-esp32/bin/xtensa-esp32-elf-*" } --pio esp32
           end
           if mcu_type == "esp32c3" then
-            return {"clangd", "--background-index", "--query-driver=/home/tristan/.espressif/tools/riscv32-esp-elf/esp-13.2.0_20230928/riscv32-esp-elf/bin/riscv32-esp-elf-*"} --pio esp32c3
+            return {"/home/tristan/.llvm-project-xtensa/llvm-project/build/bin/clangd", "--background-index", "--query-driver=/home/tristan/.espressif/tools/riscv32-esp-elf/esp-13.2.0_20230928/riscv32-esp-elf/bin/riscv32-esp-elf-*"} --pio esp32c3
           end
           if mcu_type == "esp32s3" then
             return { "/home/tristan/.llvm-project-xtensa/llvm-project/build/bin/clangd", "--background-index", "--query-driver=/home/tristan/.platformio/packages/toolchain-xtensa-esp32s3/bin/xtensa-esp32s3-elf-g*" } --pio esp32s3
