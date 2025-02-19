@@ -33,3 +33,8 @@ vim.o.softtabstop = 4
 -- TW show whitespace
 vim.o.list = true
 vim.o.listchars = "space:·"
+-- Suppress provider warnings
+vim.g.loaded_node_provider = 0
+vim.g.loaded_perl_provider = 0
+vim.g.loaded_python3_provider = 0
+vim.g.loaded_ruby_provider = 0

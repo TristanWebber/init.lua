@@ -15,4 +15,11 @@ end
 vim.opt.rtp:prepend(lazypath)
 
 -- [[ Configure plugins ]]
-require('lazy').setup('plugins')
+require('lazy').setup('plugins', {
+  opts = {
+    rocks = {
+      hererocks = false,
+      enabled = false,
+    },
+  },
+})
