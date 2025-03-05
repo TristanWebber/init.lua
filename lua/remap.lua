@@ -33,7 +33,7 @@ map('i', '{;', '{<CR>};<ESC>O')
 --map('i', '<', '<><left>')-- Finding this one a bit annoying - PITA for comparisons
 
 -- TW remap to use 'jk' instead of <ESC> to go from 'i' or 'v' to 'n' mode
-map({ 'i', 'v' }, 'jk', '<ESC>')
+map({ 'i', 'v' }, 'jk', '<ESC>', {desc='which_key_ignore'})
 
 -- TW remaps for navigation and editing
 vim.keymap.set("n", "<leader>pv", vim.cmd.Ex)
