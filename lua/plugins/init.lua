@@ -35,6 +35,7 @@ return {
     opts = {},
   },
 
+  -- TW commented out 20250306 -> Don't know if this is adding anything valuable
   -- "gc" to comment visual regions/lines
-  { 'numToStr/Comment.nvim', opts = {} },
+  -- { 'numToStr/Comment.nvim', opts = {} },
 }

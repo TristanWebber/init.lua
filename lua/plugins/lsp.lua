@@ -5,8 +5,8 @@ return {
   'neovim/nvim-lspconfig',
   dependencies = {
     -- Automatically install LSPs to stdpath for neovim
-    'williamboman/mason.nvim',
-    'williamboman/mason-lspconfig.nvim',
+    { 'mason-org/mason.nvim', opts = {} },
+    'mason-org/mason-lspconfig.nvim',
 
     -- Useful status updates for LSP
     -- NOTE: `opts = {}` is the same as calling `require('fidget').setup({})`
@@ -71,10 +71,8 @@ return {
         vim.lsp.buf.format()
       end, { desc = 'Format current buffer with LSP' })
     end
-    -- mason-lspconfig requires that these setup functions are called in this order
-    -- before setting up the servers.
-    require('mason').setup()
-    require('mason-lspconfig').setup()
+
+    -- mason-lspconfig updated to v2.x API
 
     -- Enable the following language servers
     --  Feel free to add/remove any LSPs that you want here. They will automatically be installed.
@@ -112,19 +110,14 @@ return {
     local capabilities = vim.lsp.protocol.make_client_capabilities()
     capabilities = require('cmp_nvim_lsp').default_capabilities(capabilities)
 
-    -- Ensure the servers above are installed
-    local mason_lspconfig = require 'mason-lspconfig'
-
-    mason_lspconfig.setup {
-      ensure_installed = vim.tbl_keys(servers),
-    }
-
+    -- Helper functions to assist clangd with x-compilers
     local embedded_env = {
       NONE = 1,
       PIO = 2,
       IDF = 3,
     }
 
+    -- Get the development platform environment
     local function get_embedded_env()
       local cwd = vim.loop.cwd()
       local f_pio = io.open(cwd .. "/platformio.ini")
@@ -140,6 +133,7 @@ return {
       return embedded_env.NONE
     end
 
+    -- Determine the x-compiler platform if using esp-idf
     local function get_idf_mcu()
       local cwd = vim.loop.cwd()
       for line in io.lines(cwd .. "/dependencies.lock") do
@@ -153,6 +147,7 @@ return {
       end
     end
 
+    -- Determine the x-compiler platform if using platformio
     local function get_pio_mcu()
       local cwd = vim.loop.cwd()
       for line in io.lines(cwd .. "/compile_commands.json") do
@@ -163,6 +158,7 @@ return {
       end
     end
 
+    -- Determine the clangd driver to use based on the device
     local function get_cmd(env_type)
       if env_type == embedded_env.IDF then
         local mcu_type = get_idf_mcu()
@@ -193,40 +189,44 @@ return {
       end
     end
 
-    mason_lspconfig.setup_handlers {
-      function(server_name)
-        if server_name ~= "clangd" then
-          require('lspconfig')[server_name].setup {
-            capabilities = capabilities,
-            on_attach = on_attach,
-            settings = servers[server_name],
-            filetypes = (servers[server_name] or {}).filetypes,
-          }
-        else
-            -- specific treatment of clangd for embedded projects
-          local env = get_embedded_env()
-          if env ~= embedded_env.NONE then
-            require('lspconfig').clangd.setup {
-              cmd = get_cmd(env),
-              on_attach = function(client, bufnr)
-                client.server_capabilities.signatureHelpProvider = false
-                on_attach(client, bufnr)
-              end,
+    -- Ensure the servers above are installed
+    require('mason-lspconfig').setup {
+      ensure_installed = vim.tbl_keys(servers or {}),
+      handlers = {
+        function(server_name)
+          if server_name ~= "clangd" then
+            require('lspconfig')[server_name].setup {
               capabilities = capabilities,
+              on_attach = on_attach,
+              settings = servers[server_name],
+              filetypes = (servers[server_name] or {}).filetypes,
             }
+          else
+              -- specific treatment of clangd for embedded projects
+            local env = get_embedded_env()
+            if env ~= embedded_env.NONE then
+              require('lspconfig').clangd.setup {
+                cmd = get_cmd(env),
+                on_attach = function(client, bufnr)
+                  client.server_capabilities.signatureHelpProvider = false
+                  on_attach(client, bufnr)
+                end,
+                capabilities = capabilities,
+              }
+            end
+            -- not an embedded project
+            if env == embedded_env.NONE then
+              require('lspconfig').clangd.setup {
+                on_attach = function(client, bufnr)
+                  client.server_capabilities.signatureHelpProvider = false
+                  on_attach(client, bufnr)
+                end,
+                capabilities = capabilities,
+              }
+            end
           end
-          -- not an embedded project
-          if env == embedded_env.NONE then
-            require('lspconfig').clangd.setup {
-              on_attach = function(client, bufnr)
-                client.server_capabilities.signatureHelpProvider = false
-                on_attach(client, bufnr)
-              end,
-              capabilities = capabilities,
-            }
-          end
-        end
-      end,
+        end,
+      },
     }
 
     -- TW added to get the return type from a function on hover
