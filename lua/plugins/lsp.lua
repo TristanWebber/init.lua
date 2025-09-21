@@ -155,7 +155,6 @@ return {
         if client.name == "clangd" then
           local env = get_embedded_env()
           if env ~= embedded_env.NONE then
-            print("clang embedded target")
             vim.lsp.config[client.name].cmd = get_cmd(env)
           end
         end -- clangd setup
