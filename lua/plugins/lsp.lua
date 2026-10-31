@@ -85,17 +85,16 @@ local function get_cmd(env_type)
     if mcu_type == "esp32s3" then
       return { "clangd", "--background-index", "--query-driver=/home/tristan/.espressif/tools/xtensa-esp-elf/esp-13.2.0_20230928/xtensa-esp-elf/bin/xtensa-esp32s3-elf-*" } --esp-idf esp32s3
     end
-    else if env_type == embedded_env.PIO then
-      local mcu_type = get_pio_mcu()
-      if mcu_type == "esp32" then
-        return { "clangd", "--background-index", "--query-driver=/home/tristan/.platformio/packages/toolchain-xtensa-esp32/bin/xtensa-esp32-elf-*" } --pio esp32
-      end
-      if mcu_type == "esp32c3" then
-        return {"/home/tristan/.llvm-project-xtensa/llvm-project/build/bin/clangd", "--background-index", "--query-driver=/home/tristan/.espressif/tools/riscv32-esp-elf/esp-13.2.0_20230928/riscv32-esp-elf/bin/riscv32-esp-elf-*"} --pio esp32c3
-      end
-      if mcu_type == "esp32s3" then
-        return { "/home/tristan/.llvm-project-xtensa/llvm-project/build/bin/clangd", "--background-index", "--query-driver=/home/tristan/.platformio/packages/toolchain-xtensa-esp32s3/bin/xtensa-esp32s3-elf-g*" } --pio esp32s3
-      end
+  elseif env_type == embedded_env.PIO then
+    local mcu_type = get_pio_mcu()
+    if mcu_type == "esp32" then
+      return { "clangd", "--background-index", "--query-driver=/home/tristan/.platformio/packages/toolchain-xtensa-esp32/bin/xtensa-esp32-elf-*" } --pio esp32
+    end
+    if mcu_type == "esp32c3" then
+      return {"/home/tristan/.llvm-project-xtensa/llvm-project/build/bin/clangd", "--background-index", "--query-driver=/home/tristan/.espressif/tools/riscv32-esp-elf/esp-13.2.0_20230928/riscv32-esp-elf/bin/riscv32-esp-elf-*"} --pio esp32c3
+    end
+    if mcu_type == "esp32s3" then
+      return { "/home/tristan/.llvm-project-xtensa/llvm-project/build/bin/clangd", "--background-index", "--query-driver=/home/tristan/.platformio/packages/toolchain-xtensa-esp32s3/bin/xtensa-esp32s3-elf-g*" } --pio esp32s3
     end
   end
 end
@@ -103,6 +102,9 @@ end
 vim.api.nvim_create_autocmd('LspAttach', {
   group = vim.api.nvim_create_augroup('lsp-attach', { clear = true }),
   callback = function(event)
+    local client = vim.lsp.get_client_by_id(event.data.client_id)
+    local bufnr = event.buf
+
     local nmap = function(keys, func, desc)
       if desc then
         desc = 'LSP: ' .. desc
@@ -132,9 +134,6 @@ vim.api.nvim_create_autocmd('LspAttach', {
     nmap('<leader>wl', function()
       print(vim.inspect(vim.lsp.buf.list_workspace_folders()))
     end, '[W]orkspace [L]ist Folders')
-
-    local client = vim.lsp.get_client_by_id(event.data.client_id)
-    local bufnr = client.buf
 
     -- specific treatment of clangd for embedded projects
     if client.name == "clangd" then
@@ -178,9 +177,6 @@ require('mason-lspconfig').setup {
     end,
   },
 }
-
--- TW added to get the return type from a function on hover
-vim.lsp.buf.hover()
 
 -- [[ Configure nvim-cmp ]]
 -- See `:help cmp`
